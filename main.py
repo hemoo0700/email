@@ -1,5 +1,6 @@
 import logging
 import requests
+import asyncio
 from threading import Thread
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -13,11 +14,11 @@ def home():
     return "Bot is running!"
 
 def run_flask():
-    # تشغيل سيرفر وهمي على المنفذ 8080
     app_flask.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
     t = Thread(target=run_flask)
+    t.daemon = True
     t.start()
 
 # --- إعدادات البوت الأساسية ---
@@ -77,15 +78,23 @@ async def handle_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await status_message.edit_text(final_text, parse_mode="Markdown")
 
 def main():
-    # تشغيل السيرفر الوهمي في الخلفية لحماية البوت من الإغلاق
     keep_alive()
     
+    # حل مشكلة تعارض المحرك التلقائي للبايثون الحديث
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_check))
     
     print("🚀 البوت الخاص بـ فتى قريش يعمل الآن بنجاح...")
-    app.run_polling()
+    
+    # استخدام التحديث اليدوي لتجنب خلل التحديث التلقائي في بايثون 3.14
+    app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
     main()
